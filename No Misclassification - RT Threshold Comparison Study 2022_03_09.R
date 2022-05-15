@@ -31,9 +31,8 @@ reps.EM.imputed<-100 #number of reps for EM-imputation procedure
 
 # level codings will be specified in if else statements
 
-
 #RG PATTERN
-#there are two levels: 1 = difficulty based; 2 = progressive. (for v2, reviewers wanted me to drop this factor) 
+#there are two levels: 1 = difficulty based; 2 = progressive
 rg.type <- c("Difficulty","Idiosyncratic")
 
 #PERCENTAGE OF RG RESPONSES FOR UNMOTIVATED SIMULEES
@@ -43,16 +42,17 @@ rg.percent <- c(.1,.2)
 #MISCLASSIFICATION PERCENTAGE
 misclassify.percent <-0
 
+#TEST DIFFICULTY
+#there are two levels: easy [mean b = -1] and moderate [mean b = 0]
+test.difficulty <- c("Easy", "Moderate")
 
-# We need to get a conditions matrix for a fully crossed design. In order to do this
-# efficiently we can use the expand grid function which will give us a 48x5 matrix
-# 2x2x4 = 16 levels crossed with the 4 variables: impact, NER relationship with ability, NER type, 
-#percent unmotivated simulees in focal group, percent NER for unmotivated simulees in focal group
+
+
 con <- expand.grid(rg.type,rg.percent,misclassify.percent)
 
 ##################### Setting working directory ####################
 
-setwd("G:\\My Drive\\UMN\\Research 2021-2022\\Comparison of RT Threshold Procedures to RG Misclassifications\\Simulation\\")
+setwd("G:\\My Drive\\Research\\Projects\\2021-2022\\Two-stage Scoring\\HG-MI")
 
 #reading in item parameters
 item.3PL.pars<-as.matrix(read.csv("Generating 3pl item parameters (50 items, moderate).csv"))
