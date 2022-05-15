@@ -352,7 +352,7 @@ for(count.con in 1:nrow(con)) {
     if(extract.mirt(HG,'converged')==TRUE){ 
       #need to transform parameter estimates onto theta scale
       a.HG<-ipars.HG[c(seq(1,250,5))] 
-      b.HG<--(ipars.HG[c(seq(3,250,5))])/a.HG #I am not sure if there is a problem; trying to convert cfa parameters to irt b=threshold/slope
+      b.HG<-(ipars.HG[c(seq(3,250,5))])/a.HG #I am not sure if there is a problem; trying to convert cfa parameters to irt b=threshold/slope
       c.HG<-ipars.HG[c(seq(4,250,5))] 
       #results.condition[r,36]<-ipars.HG[504] #Covariance between theta and RG propensity
       theta.HG<-matrix(fscores(HG,method='ML',max_theta=4)[,1],ncol=1) #setting upper and lower limits of theta at 4 and -4
