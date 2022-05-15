@@ -33,6 +33,10 @@ reps.EM.imputed<-100 #number of reps for EM-imputation procedure
 #MISCLASSIFICATION PERCENTAGE
 misclassify.percent <-c(.02,.04,.06,.08,.12) #corresponds to underclassifying 1, 2, 3, 4, and 6 items on average per misclassified examinee
 
+#TEST DIFFICULTY
+#there are two levels: easy [mean b = -1] and moderate [mean b = 0]
+test.difficulty <- c("Easy", "Moderate")
+
 # We need to get a conditions matrix for a fully crossed design. In order to do this
 
 con <- expand.grid(misclassify.percent)

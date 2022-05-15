@@ -7,6 +7,10 @@
 #clearing memory
 rm(list=ls())
 
+##################### Setting working directory ####################
+
+setwd("G:\\My Drive\\Research\\Projects\\2021-2022\\Two-stage Scoring\\HG-MI")
+
 ######### Specifying packages needed for analyses ############
 
 library(dplyr) #combines the simulation results into a condition matrix
@@ -25,6 +29,7 @@ N.unmot<-N*Unmot.perc #size of unmotivated sample
 N.mot<-N*(1-Unmot.perc) #size of motivated sample
 reps<-100 #number of reps for study
 reps.EM.imputed<-100 #number of reps for EM-imputation procedure
+reps.HG.imputed <- 100
 
 #################### creating conditions matrix ####################
 
@@ -47,60 +52,34 @@ misclassify.percent <-0
 test.difficulty <- c("Easy", "Moderate")
 
 
-
-con <- expand.grid(rg.type,rg.percent,misclassify.percent)
-
-##################### Setting working directory ####################
-
-setwd("G:\\My Drive\\Research\\Projects\\2021-2022\\Two-stage Scoring\\HG-MI")
+con <- expand.grid(rg.type,rg.percent,misclassify.percent, test.difficulty)
 
 #reading in item parameters
-item.3PL.pars<-as.matrix(read.csv("Generating 3pl item parameters (50 items, moderate).csv"))
-I<-nrow(item.3PL.pars) #number of items
-a.3PL.true<-as.matrix(item.3PL.pars[,1],ncol=1)
-b.3PL.true<-as.matrix(item.3PL.pars[,2],ncol=1)
-c.3PL.true<-as.matrix(item.3PL.pars[,3],ncol=1)
+item.3PL.pars.easy<-as.matrix(read.csv("Generating 3pl item parameters (50 items, easy).csv"))
+item.3PL.pars.mod <- as.matrix(read.csv("Generating 3pl item parameters (50 items, moderate).csv"))
+I<-50 #number of items
+a.3PL.true.easy<-as.matrix(item.3PL.pars.easy[,1],ncol=1)
+b.3PL.true.easy<-as.matrix(item.3PL.pars.easy[,2],ncol=1)
+c.3PL.true.easy<-as.matrix(item.3PL.pars.easy[,3],ncol=1)
+
+a.3PL.true.mod<-as.matrix(item.3PL.pars.mod[,1],ncol=1)
+b.3PL.true.mod<-as.matrix(item.3PL.pars.mod[,2],ncol=1)
+c.3PL.true.mod<-as.matrix(item.3PL.pars.mod[,3],ncol=1)
 
 
-#creating matrix for overall results by condition
-
-overall.results<-matrix(-999,nrow=nrow(con),ncol=51) #creating a matrix to place results in by condition, which will be used for the overall descriptive results
-
-colnames(overall.results)<-c(
-  
-  "Bias.a.ML","Bias.a.penalized","Bias.a.EM","Bias.a.EM.imputed","Bias.a.HG",
-  "Bias.b.ML","Bias.b.penalized","Bias.b.EM","Bias.b.EM.imputed","Bias.b.HG",
-  # "Bias.c.ML","Bias.c.penalized","Bias.c.EM","Bias.c.EM.imputed","Bias.c.HG",
-  "Bias.theta.ML","Bias.theta.penalized","Bias.theta.EM","Bias.theta.EM.imputed","Bias.theta.HG",
-  
-  #"SE.a.ML","SE.a.penalized","SE.a.EM","SE.a.EM.imputed","SE.a.HG",
-  #"SE.b.ML","SE.b.penalized","SE.b.EM","SE.b.EM.imputed","SE.b.HG",
-  #"SE.c.ML","SE.c.penalized","SE.c.EM","SE.c.EM.imputed","SE.c.HG",
-  #"SE.theta.ML","SE.theta.penalized","SE.theta.EM","SE.theta.EM.imputed","SE.theta.HG",
-  
-  "RMSE.a.ML","RMSE.a.penalized","RMSE.a.EM","RMSE.a.EM.imputed","RMSE.a.HG",
-  "RMSE.b.ML","RMSE.b.penalized","RMSE.b.EM","RMSE.b.EM.imputed","RMSE.b.HG",
-  #"RMSE.c.ML","RMSE.c.penalized","RMSE.c.EM","RMSE.c.EM.imputed","RMSE.c.HG",
-  "RMSE.theta.ML","RMSE.theta.penalized","RMSE.theta.EM","RMSE.theta.EM.imputed","RMSE.theta.HG",
-  "BIC.ML","BIC.penalized","BIC.EM","BIC.EM.imputed","BIC.HG","r.theta.RG.HG",
-  "Non.Converge.ML","Non.Converge.penalized","Non.Converge.EM","Non.Converge.EM.imputed","Non.Converge.HG",
-  
-  "Bias.unmot.theta.ML","Bias.unmot.theta.penalized","Bias.unmot.theta.EM","Bias.unmot.theta.EM.imputed","Bias.unmot.theta.HG",
-  "RMSE.unmot.theta.ML","RMSE.unmot.theta.penalized","RMSE.unmot.theta.EM","RMSE.unmot.theta.EM.imputed","RMSE.unmot.theta.HG"
-  
+#creating a matrix for overall results by condition
+overall.results <- matrix(-999, nrow = nrow(con), ncol = 20)
+colnames(overall.results) <- c(
+  "ML.all","EM.all","EM-I.all","HG.all","HG-MI.all",
+  "ML.low", "EM.low", "EM-I.low", "HG.low", "HG-MI.low",
+  "ML.medium", "EM.medium", "EM-I.medium", "HG.medium", "HG-MI.medium",
+  "ML.high", "EM.high","EM-I.high","HG.high", "HG-MI.medium"
 )
 
-
-
 #condition loop starts here
-
-
 for(count.con in 1:nrow(con)) { 
   
-  
-  results.condition<-matrix(-999,nrow=reps,ncol=51) #creating a matrix to place results in by condition, which will be used for the overall descriptive results
-  
-  
+  results.condition<-matrix(-999,nrow=reps,ncol=20) #creating a matrix to place results in by condition, which will be used for the overall descriptive results
   
   ######### REPLICATION LOOP STARTS HERE
   for (r in 1:reps){
@@ -125,11 +104,15 @@ for(count.con in 1:nrow(con)) {
       probs <- (c.par+((1-c.par)*(1/(1+exp(-logit)))))
       return(probs)}
     
-    Unmot.prob<-PL3(theta.unmot,a.3PL.true,b.3PL.true,c.3PL.true,N.unmot,I) #generating unmotivated response probabilities
-    Mot.prob<-PL3(theta.mot,a.3PL.true,b.3PL.true,c.3PL.true,N.mot,I) #generating motivated response probabilities
+    if(con[count.con,4]=="Easy"){
+      Unmot.prob<-PL3(theta.unmot,a.3PL.true.easy,b.3PL.true.easy,c.3PL.true.easy,N.unmot,I) #generating unmotivated response probabilities
+      Mot.prob<-PL3(theta.mot,a.3PL.true.easy,b.3PL.true.easy,c.3PL.true.easy,N.mot,I) #generating motivated response probabilities
+    }else if(con[count.con,4]=="Moderate"){
+      Unmot.prob<-PL3(theta.unmot,a.3PL.true.mod,b.3PL.true.mod,c.3PL.true.mod,N.unmot,I) #generating unmotivated response probabilities
+      Mot.prob<-PL3(theta.mot,a.3PL.true.mod,b.3PL.true.mod,c.3PL.true.mod,N.mot,I) #generating motivated response probabilities
+    }
     
     ######################### SAMPLING RANDOM NUMBER OF RGs FOR EACH UNMOTIVATED SIMULEE #######################
-    #this is the random number of RGs for condition with 10% RGs
     
     aa<-N*I #total number of item responses (N x I)
     bb<-aa*con[count.con,2] #number of RG responses to sample
@@ -250,73 +233,29 @@ for(count.con in 1:nrow(con)) {
     ###### ML scoring (ignoring RG responses) ########
     
     ML<-mirt(IR.combined.ML, 1, itemtype ='2PL',guess=.25, TOL = .0001, technical = list(NCYCLES = 10000))
-    ipars.ML<-coef(ML,IRTpars=TRUE,as.data.frame=TRUE) #need to read in item parameters
-    
-    
-    results.condition[r,37]<-ifelse(extract.mirt(ML,'converged')==TRUE,0,1) #if model failed to converge, give 1; otherwise, 0
+    #ipars.ML<-coef(ML,IRTpars=TRUE,as.data.frame=TRUE) #need to read in item parameters
     
     #if model converged, take parameter estimates. if not, impute missing values
-    if(results.condition[r,37]==0){ 
-      a.ML<-ipars.ML[c(seq(1,200,4))] 
-      b.ML<-ipars.ML[c(seq(2,200,4))] 
-      #c.ML<-ipars.ML[c(seq(3,200,4))] 
+    if(extract.mirt(ML,'converged')==TRUE){ 
       theta.ML<-as.matrix(fscores(ML,method='ML',max_theta=4))
-      results.condition[r,31]<-anova(ML)$BIC
       
     } else {
-      a.ML<-rep(NA,I) 
-      b.ML<-rep(NA,I) 
-      #c.ML<-rep(NA,I) 
       theta.ML<-rep(NA,N)
-      results.condition[r,31]<-NA
     }
-    
-    
-    ###### penalized scoring ######
-    
-    penalized<-mirt(IR.combined.zero,  1, itemtype ='2PL',guess=.25, TOL = .0001, technical = list(NCYCLES = 10000))
-    ipars.penalized<-coef(penalized,IRTpars=TRUE,as.data.frame=TRUE) #need to read in item parameters
-    
-    results.condition[r,38]<-ifelse(extract.mirt(penalized,'converged')==TRUE,0,1) #if model failed to converge, give 1; otherwise, 0
-    
-    #if model converged, take parameter estimates. if not, impute missing values
-    if(results.condition[r,38]==0){ 
-      a.penalized<-ipars.penalized[c(seq(1,200,4))] 
-      b.penalized<-ipars.penalized[c(seq(2,200,4))] 
-      #c.ML<-ipars.ML[c(seq(3,200,4))] 
-      theta.penalized<-as.matrix(fscores(penalized,method='ML',max_theta=4))
-      results.condition[r,32]<-anova(penalized)$BIC
-    } else {
-      a.penalized<-rep(NA,I) 
-      b.penalized<-rep(NA,I) 
-      #c.ML<-rep(NA,I) 
-      theta.penalized<-rep(NA,N) 
-      results.condition[r,32]<-NA
-      
-    }
-    
-    
     
     ###### EM scoring ######
     EM<-mirt(IR.combined.NA, 1, itemtype ='2PL',guess=.25, TOL = .0001, technical = list(NCYCLES = 10000))
-    ipars.EM<-coef(EM,IRTpars=TRUE,as.data.frame=TRUE) #need to read in item parameters
-    
-    results.condition[r,39]<-ifelse(extract.mirt(EM,'converged')==TRUE,0,1) #if model failed to converge, give 1; otherwise, 0
+    #ipars.EM<-coef(EM,IRTpars=TRUE,as.data.frame=TRUE) #need to read in item parameters
+    #results.condition[r,39]<-ifelse(extract.mirt(EM,'converged')==TRUE,0,1) #if model failed to converge, give 1; otherwise, 0
     
     #if model converged, take parameter estimates. if not, impute missing values
-    if(results.condition[r,39]==0){ 
-      a.EM<-ipars.EM[c(seq(1,200,4))] 
-      b.EM<-ipars.EM[c(seq(2,200,4))] 
-      c.EM<-ipars.ML[c(seq(3,200,4))] 
+    if(extract.mirt(EM,'converged')==TRUE){ 
       theta.EM<-as.matrix(fscores(EM,method='ML',max_theta=4))
-      results.condition[r,33]<-anova(EM)$BIC
     } else {
       a.EM<-rep(NA,I) 
       b.EM<-rep(NA,I) 
       c.EM<-rep(NA,I) 
       theta.EM<-rep(NA,N) 
-      results.condition[r,33]<-NA
-      
     }
     
     
@@ -326,22 +265,22 @@ for(count.con in 1:nrow(con)) {
     imputed.probabilities<-PL3(theta.EM,a.EM,b.EM,c.EM,N,I) #based on the theta and item parameter estimates from EM scoring
     
     
-    a.EM.imputed<-matrix(-999,nrow=I,ncol=reps.EM.imputed)
-    b.EM.imputed<-matrix(-999,nrow=I,ncol=reps.EM.imputed)
+    # a.EM.imputed<-matrix(-999,nrow=I,ncol=reps.EM.imputed)
+    # b.EM.imputed<-matrix(-999,nrow=I,ncol=reps.EM.imputed)
     #c.EM.imputed<-matrix(-999,nrow=I,ncol=reps.EM.imputed)
-    converged.EM.imputed<-matrix(-999,nrow=1,ncol=reps.EM.imputed)
+    #converged.EM.imputed<-matrix(-999,nrow=1,ncol=reps.EM.imputed)
     theta.EM.imputed<-matrix(-999,nrow=N,ncol=reps.EM.imputed)
     
     
-    if(results.condition[r,39]==1){
+    if(extract.mirt(EM,'converged')==FALSE){
       
-      a.EM.imputed<-matrix(rep(matrix(rep(NA,I),ncol=1),reps.EM.imputed),ncol=reps.EM.imputed) 
-      b.EM.imputed<-matrix(rep(matrix(rep(NA,I),ncol=1),reps.EM.imputed),ncol=reps.EM.imputed) 
+      # a.EM.imputed<-matrix(rep(matrix(rep(NA,I),ncol=1),reps.EM.imputed),ncol=reps.EM.imputed) 
+      # b.EM.imputed<-matrix(rep(matrix(rep(NA,I),ncol=1),reps.EM.imputed),ncol=reps.EM.imputed) 
       #c.ML<-rep(NA,I) 
       theta.EM.imputed<-matrix(rep(matrix(rep(NA,N),ncol=1),reps.EM.imputed),ncol=reps.EM.imputed)
-      converged.EM.imputed<-matrix(1,nrow=1,ncol=reps.EM.imputed)
+      #converged.EM.imputed<-matrix(1,nrow=1,ncol=reps.EM.imputed)
       
-    } else if (results.condition[r,39]==0){
+    } else if (extract.mirt(EM,'converged')==TRUE){
       
       
       for(r.EM.impute in 1:reps.EM.imputed){
@@ -353,24 +292,24 @@ for(count.con in 1:nrow(con)) {
         colnames(IR.EM.imputed)<-rep(1:I)
         
         EM.imputed<-mirt(IR.EM.imputed,  1, itemtype ='2PL',guess=.25, TOL = .0001, technical = list(NCYCLES = 10000))
-        ipars.EM.imputed<-coef(EM.imputed,IRTpars=TRUE,as.data.frame=TRUE) #need to read in item parameters
+        #ipars.EM.imputed<-coef(EM.imputed,IRTpars=TRUE,as.data.frame=TRUE) #need to read in item parameters
         
-        converged.EM.imputed[,r.EM.impute]<-ifelse(extract.mirt(EM.imputed,'converged')==TRUE,0,1) #if model failed to converge, give 1; otherwise, 0
+        #converged.EM.imputed[,r.EM.impute]<-ifelse(extract.mirt(EM.imputed,'converged')==TRUE,0,1) #if model failed to converge, give 1; otherwise, 0
         
         #if model converged, take parameter estimates. if not, impute missing values
         if(extract.mirt(EM.imputed,'converged')==TRUE){ 
-          a.EM.imputed[,r.EM.impute]<-ipars.EM.imputed[c(seq(1,200,4))] 
-          b.EM.imputed[,r.EM.impute]<-ipars.EM.imputed[c(seq(2,200,4))] 
+          # a.EM.imputed[,r.EM.impute]<-ipars.EM.imputed[c(seq(1,200,4))] 
+          # b.EM.imputed[,r.EM.impute]<-ipars.EM.imputed[c(seq(2,200,4))] 
           #c.ML<-ipars.ML[c(seq(3,200,4))] 
           theta.EM.imputed[,r.EM.impute]<-as.matrix(fscores(EM.imputed,method='ML',max_theta=4))
-          results.condition[r,34]<-anova(EM.imputed)$BIC
+          #results.condition[r,34]<-anova(EM.imputed)$BIC
           
         } else if (extract.mirt(EM.imputed,'converged')==FALSE){
-          a.EM.imputed[,r.EM.impute]<-matrix(rep(NA,I),ncol=1) 
-          b.EM.imputed[,r.EM.impute]<-rep(NA,I) 
+          # a.EM.imputed[,r.EM.impute]<-matrix(rep(NA,I),ncol=1) 
+          # b.EM.imputed[,r.EM.impute]<-rep(NA,I) 
           #c.ML<-rep(NA,I) 
           theta.EM.imputed[,r.EM.impute]<-rep(NA,N) 
-          results.condition[r,34]<-NA
+          #results.condition[r,34]<-NA
           
         }
         
@@ -379,12 +318,12 @@ for(count.con in 1:nrow(con)) {
     } #closes if/else statement above
     
     
-    a.EM.imputed<-matrix(rowMeans(a.EM.imputed,na.rm=TRUE),ncol=1)
-    b.EM.imputed<-matrix(rowMeans(b.EM.imputed,na.rm=TRUE),ncol=1)
+    # a.EM.imputed<-matrix(rowMeans(a.EM.imputed,na.rm=TRUE),ncol=1)
+    # b.EM.imputed<-matrix(rowMeans(b.EM.imputed,na.rm=TRUE),ncol=1)
     #c.EM.imputed<-matrix(rowMeans(c.EM.imputed),ncol=1)
     theta.EM.imputed<-matrix(rowMeans(theta.EM.imputed,na.rm=TRUE),ncol=1)
     
-    results.condition[r,40]<-matrix(rowMeans(converged.EM.imputed,na.rm=TRUE),ncol=1) #average reps nonconverged
+    #results.condition[r,40]<-matrix(rowMeans(converged.EM.imputed,na.rm=TRUE),ncol=1) #average reps nonconverged
     
     
    
@@ -405,29 +344,38 @@ for(count.con in 1:nrow(con)) {
     
     item.type<-c(rep('2PL',50),rep('Rasch',50))
     HG<-mirt(data.factor, model,itemtype =item.type,guess=as.vector(c(rep(.25,50),rep(0,50))), TOL = .0001, technical = list(NCYCLES = 10000))
-    ipars.HG<-coef(HG,as.data.frame=TRUE)
+    #ipars.HG<-coef(HG,as.data.frame=TRUE)
     
-    results.condition[r,41]<-ifelse(extract.mirt(HG,'converged')==TRUE,0,1) #if model failed to converge, give 1; otherwise, 0
+    #results.condition[r,41]<-ifelse(extract.mirt(HG,'converged')==TRUE,0,1) #if model failed to converge, give 1; otherwise, 0
     
     #if model converged, take parameter estimates. if not, impute missing values
-    if(results.condition[r,41]==0){ 
+    if(extract.mirt(HG,'converged')==TRUE){ 
       #need to transform parameter estimates onto theta scale
       a.HG<-ipars.HG[c(seq(1,250,5))] 
       b.HG<--(ipars.HG[c(seq(3,250,5))])/a.HG #I am not sure if there is a problem; trying to convert cfa parameters to irt b=threshold/slope
-      #c.HG<-ipars.HG[c(seq(4,250,5))] 
-      results.condition[r,36]<-ipars.HG[504] #Covariance between theta and RG propensity
+      c.HG<-ipars.HG[c(seq(4,250,5))] 
+      #results.condition[r,36]<-ipars.HG[504] #Covariance between theta and RG propensity
       theta.HG<-matrix(fscores(HG,method='ML',max_theta=4)[,1],ncol=1) #setting upper and lower limits of theta at 4 and -4
-      results.condition[r,35]<-anova(HG)$BIC
+      #results.condition[r,35]<-anova(HG)$BIC
       
     } else {
-      a.HG<-rep(NA,2*I) 
-      b.HG<-rep(NA,2*I)  #I am not sure if there is a problem; trying to convert cfa parameters to irt b=threshold/slope
+      # a.HG<-rep(NA,2*I) 
+      # b.HG<-rep(NA,2*I)  #I am not sure if there is a problem; trying to convert cfa parameters to irt b=threshold/slope
       #c.HG<-ipars.HG[c(seq(4,250,5))] 
-      results.condition[r,36]<-NA #Covariance between theta and RG propensity
+      #results.condition[r,36]<-NA #Covariance between theta and RG propensity
       theta.HG<-rep(NA,N) #setting upper and lower limits of theta at 4 and -4
-      results.condition[r,35]<-NA
+      #results.condition[r,35]<-NA
       
     }
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     ###################################
