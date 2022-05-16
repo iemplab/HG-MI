@@ -93,6 +93,17 @@ for(count.con in 1:nrow(con)) {
     theta.mot<-matrix(rnorm(N.mot,0,1),ncol=1) #motivated ability, standard normal
     theta.combined<-rbind(theta.unmot,theta.mot)
     
+    #breakdown unmotivated simulees into low, medium, and high ability subgroups by their true theta
+    if(con[count.con,1]=="Difficulty"){
+      id.high <- which(theta.unmot >0 | theta.unmot <0.5)
+      id.medium <- which(theta.unmot >=-1 | theta.unmot <=0)
+      id.low <- which(theta.unmot < -1)
+    }else if(con[count.con,1]=="Idiosyncratic"){
+      id.high <- which(theta.unmot >0.5)
+      id.medium <- which(theta.unmot >=-0.5 | theta.unmot <=0.5)
+      id.low <- which(theta.unmot < -0.5)
+    }
+    
     ##################### Generating response probabilities ##############
     
     #creating function to compute 3pl 
@@ -245,11 +256,14 @@ for(count.con in 1:nrow(con)) {
     
     ###### EM scoring ######
     EM<-mirt(IR.combined.NA, 1, itemtype ='2PL',guess=.25, TOL = .0001, technical = list(NCYCLES = 10000))
-    #ipars.EM<-coef(EM,IRTpars=TRUE,as.data.frame=TRUE) #need to read in item parameters
+    ipars.EM<-coef(EM,IRTpars=TRUE,as.data.frame=TRUE) #need to read in item parameters
     #results.condition[r,39]<-ifelse(extract.mirt(EM,'converged')==TRUE,0,1) #if model failed to converge, give 1; otherwise, 0
     
     #if model converged, take parameter estimates. if not, impute missing values
     if(extract.mirt(EM,'converged')==TRUE){ 
+      a.EM<-ipars.EM[c(seq(1,200,4))] 
+      b.EM<-ipars.EM[c(seq(2,200,4))] 
+      c.EM<-ipars.ML[c(seq(3,200,4))] 
       theta.EM<-as.matrix(fscores(EM,method='ML',max_theta=4))
     } else {
       a.EM<-rep(NA,I) 
@@ -344,7 +358,7 @@ for(count.con in 1:nrow(con)) {
     
     item.type<-c(rep('2PL',50),rep('Rasch',50))
     HG<-mirt(data.factor, model,itemtype =item.type,guess=as.vector(c(rep(.25,50),rep(0,50))), TOL = .0001, technical = list(NCYCLES = 10000))
-    #ipars.HG<-coef(HG,as.data.frame=TRUE)
+    ipars.HG<-coef(HG,as.data.frame=TRUE)
     
     #results.condition[r,41]<-ifelse(extract.mirt(HG,'converged')==TRUE,0,1) #if model failed to converge, give 1; otherwise, 0
     
@@ -352,15 +366,16 @@ for(count.con in 1:nrow(con)) {
     if(extract.mirt(HG,'converged')==TRUE){ 
       #need to transform parameter estimates onto theta scale
       a.HG<-ipars.HG[c(seq(1,250,5))] 
-      b.HG<-(ipars.HG[c(seq(3,250,5))])/a.HG #I am not sure if there is a problem; trying to convert cfa parameters to irt b=threshold/slope
-      c.HG<-ipars.HG[c(seq(4,250,5))] 
+      b.HG<- -(ipars.HG[c(seq(3,250,5))])/a.HG #I am not sure if there is a problem; trying to convert cfa parameters to irt b=-threshold/slope
+      d.HG <-ipars.HG[c(seq(3,250,5))]
+      #c.HG<-ipars.HG[c(seq(4,250,5))] 
       #results.condition[r,36]<-ipars.HG[504] #Covariance between theta and RG propensity
       theta.HG<-matrix(fscores(HG,method='ML',max_theta=4)[,1],ncol=1) #setting upper and lower limits of theta at 4 and -4
       #results.condition[r,35]<-anova(HG)$BIC
       
     } else {
-      # a.HG<-rep(NA,2*I) 
-      # b.HG<-rep(NA,2*I)  #I am not sure if there is a problem; trying to convert cfa parameters to irt b=threshold/slope
+      a.HG<-rep(NA,2*I) 
+      b.HG<-rep(NA,2*I)  #I am not sure if there is a problem; trying to convert cfa parameters to irt b=threshold/slope
       #c.HG<-ipars.HG[c(seq(4,250,5))] 
       #results.condition[r,36]<-NA #Covariance between theta and RG propensity
       theta.HG<-rep(NA,N) #setting upper and lower limits of theta at 4 and -4
@@ -369,15 +384,57 @@ for(count.con in 1:nrow(con)) {
     }
     
     
+    ##### HG-MI scoring #####
+    
+    # parameters obtatined from HG scoring: a.HG, b.HG, d.HG, theta.HG
+    
+    #imputing probabilities
+    HG.imputed.probabilities<-PL3(theta.HG,a.HG,b.HG,c.HG,N,I) #based on the theta and item parameter estimates from HG scoring
     
     
+    theta.HG.imputed<-matrix(-999,nrow=N,ncol=reps.HG.imputed)
     
     
+    if(extract.mirt(HG,'converged')==FALSE){
+      
+      theta.HG.imputed<-matrix(rep(matrix(rep(NA,N),ncol=1),reps.HG.imputed),ncol=reps.HG.imputed)
+      
+    } else if (extract.mirt(HG,'converged')==TRUE){
+      
+      for(r.HG.impute in 1:reps.HG.imputed){
+        
+        rnd.unif.impute <- matrix(runif(N*I, 0, 1), nrow = N, ncol = I)
+        
+        #transforming probs to 0/1 for when noneffortful responses are in the data matrix
+        IR.HG.imputed <- (ifelse(HG.imputed.probabilities > rnd.unif.impute,1,0)) #Coding responses as 0/1 for IRT software#
+        colnames(IR.HG.imputed)<-rep(1:I)
+        
+        #fix item parameters
+        sv <-  mirt(IR.HG.imputed, 1, itemtype = "2PL", guess = .25, TOL = .0001, technical = list(NCYCLES = 10000), pars = 'values')
+        sv$value[sv$name == 'a1'] <- a.HG
+        sv$value[sv$name =='d'] <- d.HG
+        sv$est <- FALSE
+        
+        HG.imputed<-mirt(IR.HG.imputed, 1, itemtype = "2PL", guess = .25, TOL = .0001, technical = list(NCYCLES = 10000), pars = sv)
+        
+        #if model converged, take parameter estimates. if not, impute missing values
+        if(extract.mirt(HG.imputed,'converged')==TRUE){ 
+          theta.HG.imputed[,r.HG.impute]<-as.matrix(fscores(HG.imputed,method='ML',max_theta=4))
+          
+        } else if (extract.mirt(HG.imputed,'converged')==FALSE){
+          theta.HG.imputed[,r.HG.impute]<-rep(NA,N) 
+          
+        }
+        
+      }
+      
+    } #closes if/else statement above
+    
+
+    theta.HG.imputed<-matrix(rowMeans(theta.HG.imputed,na.rm=TRUE),ncol=1)  
     
     
-    
-    
-    
+  
     ###################################
     #                                 #
     # CALCULATE DEPENDENT VARIABLES   #
@@ -385,89 +442,40 @@ for(count.con in 1:nrow(con)) {
     ###################################
     #have to drop missing data to run simdesign functions
     
-    #dropping missing cases for a.ML
-    a.ML.data<-cbind(a.ML,a.3PL.true)
-    a.ML.recoded<-matrix(a.ML.data[complete.cases(a.ML.data), ],ncol=2)
-    colnames(a.ML.recoded)<-c("a.ML","a.True")
-    
-    #dropping missing cases for b.ML
-    b.ML.data<-cbind(b.ML,b.3PL.true)
-    b.ML.recoded<-matrix(b.ML.data[complete.cases(b.ML.data), ],ncol=2)
-    colnames(b.ML.recoded)<-c("b.ML","b.True")
-    
     #dropping missing cases for theta.ML
     theta.ML.data<-cbind(theta.ML,theta.combined)
     theta.ML.recoded<-matrix(theta.ML.data[complete.cases(theta.ML.data), ],ncol=2)
     theta.ML.recoded <- theta.ML.recoded[!is.infinite(rowSums(theta.ML.recoded)),] #removing any cases with inifite theta estimates
+    theta.ML.recoded <- theta.ML.recoded[1:N.unmot]
     colnames(theta.ML.recoded)<-c("theta.ML","theta.True")
-    
-    
-    #dropping missing cases for a.penalized
-    a.penalized.data<-cbind(a.penalized,a.3PL.true)
-    a.penalized.recoded<-matrix(a.penalized.data[complete.cases(a.penalized.data), ],ncol=2)
-    colnames(a.penalized.recoded)<-c("a.penalized","a.True")
-    
-    #dropping missing cases for b.penalized
-    b.penalized.data<-cbind(b.penalized,b.3PL.true)
-    b.penalized.recoded<-matrix(b.penalized.data[complete.cases(b.penalized.data), ],ncol=2)
-    colnames(b.penalized.recoded)<-c("b.penalized","b.True")
-    
-    #dropping missing cases for theta.penalized
-    theta.penalized.data<-cbind(theta.penalized,theta.combined)
-    theta.penalized.recoded<-matrix(theta.penalized.data[complete.cases(theta.penalized.data), ],ncol=2)
-    theta.penalized.recoded <- theta.penalized.recoded[!is.infinite(rowSums(theta.penalized.recoded)),] #removing any cases with inifite theta estimates
-    colnames(theta.penalized.recoded)<-c("theta.penalized","theta.True")
-    
-    
-    #dropping missing cases for a.EM
-    a.EM.data<-cbind(a.EM,a.3PL.true)
-    a.EM.recoded<-matrix(a.EM.data[complete.cases(a.EM.data), ],ncol=2)
-    colnames(a.EM.recoded)<-c("a.EM","a.True")
-    
-    #dropping missing cases for b.EM
-    b.EM.data<-cbind(b.EM,b.3PL.true)
-    b.EM.recoded<-matrix(b.EM.data[complete.cases(b.EM.data), ],ncol=2)
-    colnames(b.EM.recoded)<-c("b.EM","b.True")
-    
+
     #dropping missing cases for theta.EM
     theta.EM.data<-cbind(theta.EM,theta.combined)
     theta.EM.recoded<-matrix(theta.EM.data[complete.cases(theta.EM.data), ],ncol=2)
     theta.EM.recoded <- theta.EM.recoded[!is.infinite(rowSums(theta.EM.recoded)),] #removing any cases with inifite theta estimates
+    theta.EM.recoded <- theta.EM.recoded[1:N.unmot]
     colnames(theta.EM.recoded)<-c("theta.EM","theta.True")
-    
-    
-    #dropping missing cases for a.EM.imputed
-    a.EM.imputed.data<-cbind(a.EM.imputed,a.3PL.true)
-    a.EM.imputed.recoded<-matrix(a.EM.imputed.data[complete.cases(a.EM.imputed.data), ],ncol=2)
-    colnames(a.EM.imputed.recoded)<-c("a.EM.imputed","a.True")
-    
-    #dropping missing cases for b.EM.imputed
-    b.EM.imputed.data<-cbind(b.EM.imputed,b.3PL.true)
-    b.EM.imputed.recoded<-matrix(b.EM.imputed.data[complete.cases(b.EM.imputed.data), ],ncol=2)
-    colnames(b.EM.imputed.recoded)<-c("b.EM.imputed","b.True")
     
     #dropping missing cases for theta.EM.imputed
     theta.EM.imputed.data<-cbind(theta.EM.imputed,theta.combined)
     theta.EM.imputed.recoded<-matrix(theta.EM.imputed.data[complete.cases(theta.EM.imputed.data), ],ncol=2)
     theta.EM.imputed.recoded <- theta.EM.imputed.recoded[!is.infinite(rowSums(theta.EM.imputed.recoded)),] #removing any cases with inifite theta estimates
+    theta.EM.imputed.recoded <- theta.EM.imputed.recoded[1:N.unmot]
     colnames(theta.EM.imputed.recoded)<-c("theta.EM.imputed","theta.True")
-    
-    
-    #dropping missing cases for a.HG
-    a.HG.data<-cbind(a.HG,a.3PL.true)
-    a.HG.recoded<-matrix(a.HG.data[complete.cases(a.HG.data), ],ncol=2)
-    colnames(a.HG.recoded)<-c("a.HG","a.True")
-    
-    #dropping missing cases for b.HG
-    b.HG.data<-cbind(b.HG,b.3PL.true)
-    b.HG.recoded<-matrix(b.HG.data[complete.cases(b.HG.data), ],ncol=2)
-    colnames(b.HG.recoded)<-c("b.HG","b.True")
     
     #dropping missing cases for theta.HG
     theta.HG.data<-cbind(theta.HG,theta.combined)
     theta.HG.recoded<-matrix(theta.HG.data[complete.cases(theta.HG.data), ],ncol=2)
     theta.HG.recoded <- theta.HG.recoded[!is.infinite(rowSums(theta.HG.recoded)),] #removing any cases with inifite theta estimates
+    theta.HG.recoded <- theta.HG.recoded[1:N.unmot]
     colnames(theta.HG.recoded)<-c("theta.HG","theta.True")
+    
+    #dropping missing cases for theta.HG.imputed
+    theta.HG.imputed.data<-cbind(theta.HG.imputed,theta.combined)
+    theta.HG.imputed.recoded<-matrix(theta.HG.imputed.data[complete.cases(theta.HG.imputed.data), ],ncol=2)
+    theta.HG.imputed.recoded <- theta.HG.imputed.recoded[!is.infinite(rowSums(theta.HG.imputed.recoded)),] #removing any cases with inifite theta estimates
+    theta.HG.imputed.recoded <- theta.HG.imputed.recoded[1:N.unmot]
+    colnames(theta.HG.imputed.recoded)<-c("theta.HG.Imputed","theta.True")
     
     
     
@@ -475,138 +483,87 @@ for(count.con in 1:nrow(con)) {
     ################ CALCULATING DEPENDENT VARIABLES ###########
     
     #ML
-    if(nrow(a.ML.recoded)>0){
-      results.condition[r,1]<-bias(a.ML.recoded[,"a.ML"],a.ML.recoded[,"a.True"],type="bias")
-      results.condition[r,6]<-bias(b.ML.recoded[,"b.ML"],b.ML.recoded[,"b.True"],type="bias")
-      results.condition[r,11]<-bias(theta.ML.recoded[,"theta.ML"],theta.ML.recoded[,"theta.True"],type="bias")
-      results.condition[r,16]<-RMSE(a.ML.recoded[,"a.ML"],a.ML.recoded[,"a.True"],type="RMSE")
-      results.condition[r,21]<-RMSE(b.ML.recoded[,"b.ML"],b.ML.recoded[,"b.True"],type="RMSE")
-      results.condition[r,26]<-RMSE(theta.ML.recoded[,"theta.ML"],theta.ML.recoded[,"theta.True"],type="RMSE")
-      results.condition[r,42]<-bias(theta.ML.recoded[1:N.unmot,"theta.ML"],theta.ML.recoded[1:N.unmot,"theta.True"],type="bias")
-      results.condition[r,47]<-RMSE(theta.ML.recoded[1:N.unmot,"theta.ML"],theta.ML.recoded[1:N.unmot,"theta.True"],type="RMSE")
-      
+    if(nrow(theta.ML.recoded)>0){
+      results.condition[r,1]<-RMSE(theta.ML.recoded[,"theta.ML"],theta.ML.recoded[,"theta.True"],type="RMSE")#all
+      results.condition[r,6]<-RMSE(theta.ML.recoded[id.low,"theta.ML"],theta.ML.recoded[id.low,"theta.True"],type="RMSE")#low
+      results.condition[r,11]<-RMSE(theta.ML.recoded[id.medium,"theta.ML"],theta.ML.recoded[id.medium,"theta.True"],type="RMSE")#medium
+      results.condition[r,16]<-RMSE(theta.ML.recoded[id.high,"theta.ML"],theta.ML.recoded[id.high,"theta.True"],type="RMSE")#high
+
     } else {
       results.condition[r,1]<-NA
-      results.condition[r,6]<-NA
+      esults.condition[r,6]<-NA
       results.condition[r,11]<-NA
       results.condition[r,16]<-NA
-      results.condition[r,21]<-NA
-      results.condition[r,26]<-NA
-      results.condition[r,42]<-NA
-      results.condition[r,47]<-NA
     }
     
-    #Penalized
-    
-    if(nrow(a.penalized.recoded)>0){
-      results.condition[r,2]<-bias(a.penalized.recoded[,"a.penalized"],a.penalized.recoded[,"a.True"],type="bias")
-      results.condition[r,7]<-bias(b.penalized.recoded[,"b.penalized"],b.penalized.recoded[,"b.True"],type="bias")
-      results.condition[r,12]<-bias(theta.penalized.recoded[,"theta.penalized"],theta.penalized.recoded[,"theta.True"],type="bias")
-      results.condition[r,17]<-RMSE(a.penalized.recoded[,"a.penalized"],a.penalized.recoded[,"a.True"],type="RMSE")
-      results.condition[r,22]<-RMSE(b.penalized.recoded[,"b.penalized"],b.penalized.recoded[,"b.True"],type="RMSE")
-      results.condition[r,27]<-RMSE(theta.penalized.recoded[,"theta.penalized"],theta.penalized.recoded[,"theta.True"],type="RMSE")
-      results.condition[r,43]<-bias(theta.penalized.recoded[1:N.unmot,"theta.penalized"],theta.penalized.recoded[1:N.unmot,"theta.True"],type="bias")
-      results.condition[r,48]<-RMSE(theta.penalized.recoded[1:N.unmot,"theta.penalized"],theta.penalized.recoded[1:N.unmot,"theta.True"],type="RMSE")
-      
-      
-      } else {
-        results.condition[r,2]<-NA
-        results.condition[r,7]<-NA
-        results.condition[r,12]<-NA
-        results.condition[r,17]<-NA
-        results.condition[r,22]<-NA
-        results.condition[r,27]<-NA
-        results.condition[r,43]<-NA
-        results.condition[r,48]<-NA
-        
-      }
-    
-    
-    
+
     #EM
-    
-    if(nrow(a.EM.recoded)>0){
-      results.condition[r,3]<-bias(a.EM.recoded[,"a.EM"],a.EM.recoded[,"a.True"],type="bias")
-      results.condition[r,8]<-bias(b.EM.recoded[,"b.EM"],b.EM.recoded[,"b.True"],type="bias")
-      results.condition[r,13]<-bias(theta.EM.recoded[,"theta.EM"],theta.EM.recoded[,"theta.True"],type="bias")
-      results.condition[r,18]<-RMSE(a.EM.recoded[,"a.EM"],a.EM.recoded[,"a.True"],type="RMSE")
-      results.condition[r,23]<-RMSE(b.EM.recoded[,"b.EM"],b.EM.recoded[,"b.True"],type="RMSE")
-      results.condition[r,28]<-RMSE(theta.EM.recoded[,"theta.EM"],theta.EM.recoded[,"theta.True"],type="RMSE")
-      results.condition[r,44]<-bias(theta.EM.recoded[1:N.unmot,"theta.EM"],theta.EM.recoded[1:N.unmot,"theta.True"],type="bias")
-      results.condition[r,49]<-RMSE(theta.EM.recoded[1:N.unmot,"theta.EM"],theta.EM.recoded[1:N.unmot,"theta.True"],type="RMSE")
+    if(nrow(theta.EM.recoded)>0){
+      results.condition[r,2]<-RMSE(theta.EM.recoded[,"theta.ML"],theta.EM.recoded[,"theta.True"],type="RMSE")#all
+      results.condition[r,7]<-RMSE(theta.EM.recoded[id.low,"theta.ML"],theta.EM.recoded[id.low,"theta.True"],type="RMSE")#low
+      results.condition[r,12]<-RMSE(theta.EM.recoded[id.medium,"theta.ML"],theta.EM.recoded[id.medium,"theta.True"],type="RMSE")#medium
+      results.condition[r,17]<-RMSE(theta.EM.recoded[id.high,"theta.ML"],theta.EM.recoded[id.high,"theta.True"],type="RMSE")#high
       
     } else {
-        
-      results.condition[r,3]<-NA
-      results.condition[r,8]<-NA
-      results.condition[r,13]<-NA
-      results.condition[r,18]<-NA
-      results.condition[r,23]<-NA
-      results.condition[r,28]<-NA
-      results.condition[r,44]<-NA
-      results.condition[r,49]<-NA
-      }
+      results.condition[r,2]<-NA
+      esults.condition[r,7]<-NA
+      results.condition[r,12]<-NA
+      results.condition[r,17]<-NA
+    }
     
     
     #EM Imputation
-    
-    if(nrow(a.EM.imputed.recoded)>0){
-    
-      results.condition[r,4]<-bias(a.EM.imputed.recoded[,"a.EM.imputed"],a.EM.imputed.recoded[,"a.True"],type="bias")
-      results.condition[r,9]<-bias(b.EM.imputed.recoded[,"b.EM.imputed"],b.EM.imputed.recoded[,"b.True"],type="bias")
-      results.condition[r,14]<-bias(theta.EM.imputed.recoded[,"theta.EM.imputed"],theta.EM.imputed.recoded[,"theta.True"],type="bias")
-      results.condition[r,19]<-RMSE(a.EM.imputed.recoded[,"a.EM.imputed"],a.EM.imputed.recoded[,"a.True"],type="RMSE")
-      results.condition[r,24]<-RMSE(b.EM.imputed.recoded[,"b.EM.imputed"],b.EM.imputed.recoded[,"b.True"],type="RMSE")
-      results.condition[r,29]<-RMSE(theta.EM.imputed.recoded[,"theta.EM.imputed"],theta.EM.imputed.recoded[,"theta.True"],type="RMSE")
-      results.condition[r,45]<-bias(theta.EM.imputed.recoded[1:N.unmot,"theta.EM.imputed"],theta.EM.imputed.recoded[1:N.unmot,"theta.True"],type="bias")
-      results.condition[r,50]<-RMSE(theta.EM.imputed.recoded[1:N.unmot,"theta.EM.imputed"],theta.EM.imputed.recoded[1:N.unmot,"theta.True"],type="RMSE")
+    if(nrow(theta.EM.imputed.recoded)>0){
+      results.condition[r,3]<-RMSE(theta.EM.imputed.recoded[,"theta.ML"],theta.EM.imputed.recoded[,"theta.True"],type="RMSE")#all
+      results.condition[r,8]<-RMSE(theta.EM.imputed.recoded[id.low,"theta.ML"],theta.EM.imputed.recoded[id.low,"theta.True"],type="RMSE")#low
+      results.condition[r,13]<-RMSE(theta.EM.imputed.recoded[id.medium,"theta.ML"],theta.EM.imputed.recoded[id.medium,"theta.True"],type="RMSE")#medium
+      results.condition[r,18]<-RMSE(theta.EM.imputed.recoded[id.high,"theta.ML"],theta.EM.imputed.recoded[id.high,"theta.True"],type="RMSE")#high
       
     } else {
-      results.condition[r,4]<-NA
-      results.condition[r,9]<-NA
-      results.condition[r,14]<-NA
-      results.condition[r,19]<-NA
-      results.condition[r,24]<-NA
-      results.condition[r,29]<-NA
-      results.condition[r,45]<-NA
-      results.condition[r,50]<-NA
+      results.condition[r,3]<-NA
+      esults.condition[r,8]<-NA
+      results.condition[r,13]<-NA
+      results.condition[r,18]<-NA
     }
     
     
     
     #HG
+    if(nrow(theta.HG.recoded)>0){
+      results.condition[r,4]<-RMSE(theta.HG.recoded[,"theta.ML"],theta.HG.recoded[,"theta.True"],type="RMSE")#all
+      results.condition[r,19]<-RMSE(theta.HG.recoded[id.low,"theta.ML"],theta.HG.recoded[id.low,"theta.True"],type="RMSE")#low
+      results.condition[r,14]<-RMSE(theta.HG.recoded[id.medium,"theta.ML"],theta.HG.recoded[id.medium,"theta.True"],type="RMSE")#medium
+      results.condition[r,19]<-RMSE(theta.HG.recoded[id.high,"theta.ML"],theta.HG.recoded[id.high,"theta.True"],type="RMSE")#high
+      
+    } else {
+      results.condition[r,4]<-NA
+      esults.condition[r,9]<-NA
+      results.condition[r,14]<-NA
+      results.condition[r,19]<-NA
+    }
     
-    if(nrow(a.HG.recoded)>0){
-      results.condition[r,5]<-bias(a.HG.recoded[,"a.HG"],a.HG.recoded[,"a.True"],type="bias")
-      results.condition[r,10]<-bias(b.HG.recoded[,"b.HG"],b.HG.recoded[,"b.True"],type="bias")
-      results.condition[r,15]<-bias(theta.HG.recoded[,"theta.HG"],theta.HG.recoded[,"theta.True"],type="bias")
-      results.condition[r,20]<-RMSE(a.HG.recoded[,"a.HG"],a.HG.recoded[,"a.True"],type="RMSE")
-      results.condition[r,25]<-RMSE(b.HG.recoded[,"b.HG"],b.HG.recoded[,"b.True"],type="RMSE")
-      results.condition[r,30]<-RMSE(theta.HG.recoded[,"theta.HG"],theta.HG.recoded[,"theta.True"],type="RMSE")
-      results.condition[r,46]<-bias(theta.HG.recoded[1:N.unmot,"theta.HG"],theta.HG.recoded[1:N.unmot,"theta.True"],type="bias")
-      results.condition[r,51]<-RMSE(theta.HG.recoded[1:N.unmot,"theta.HG"],theta.HG.recoded[1:N.unmot,"theta.True"],type="RMSE")
+    
+    #HG-MI
+    if(nrow(theta.HG.imputed.recoded)>0){
+      results.condition[r,5]<-RMSE(theta.HG.imputed.recoded[,"theta.ML"],theta.HG.imputed.recoded[,"theta.True"],type="RMSE")#all
+      results.condition[r,10]<-RMSE(theta.HG.imputed.recoded[id.low,"theta.ML"],theta.HG.imputed.recoded[id.low,"theta.True"],type="RMSE")#low
+      results.condition[r,15]<-RMSE(theta.HG.imputed.recoded[id.medium,"theta.ML"],theta.HG.imputed.recoded[id.medium,"theta.True"],type="RMSE")#medium
+      results.condition[r,20]<-RMSE(theta.HG.imputed.recoded[id.high,"theta.ML"],theta.HG.imputed.recoded[id.high,"theta.True"],type="RMSE")#high
+      
     } else {
       results.condition[r,5]<-NA
-      results.condition[r,10]<-NA
+      esults.condition[r,10]<-NA
       results.condition[r,15]<-NA
       results.condition[r,20]<-NA
-      results.condition[r,25]<-NA
-      results.condition[r,30]<-NA
-      results.condition[r,46]<-NA
-      results.condition[r,51]<-NA
     }
-      
-   
-     
     
     
   } #closes the rep loop
   
   #place descriptive results for each condition into an overall matrix that will be printed out
-  overall.results[count.con,1:51]<-colMeans(results.condition[,1:51],na.rm = TRUE)
+  overall.results[count.con,1:20]<-colMeans(results.condition[,1:20],na.rm = TRUE)
   
   print(count.con) #printing number of condition
-  #count.con = count.con + 1
   
   
 } #closes the condition loop; the parenthesis around the bracket will calculate the run time
@@ -615,10 +572,12 @@ for(count.con in 1:nrow(con)) {
 overall.results.output<-data.frame(cbind(matrix(con[,1],ncol=1),
                                          matrix(con[,2],ncol=1),
                                          matrix(con[,3],ncol=1),
+                                         matrix(con[,4],ncol = 1),
                                          overall.results))
 
 names(overall.results.output)[names(overall.results.output) == "V1"]<-"RG Type"
 names(overall.results.output)[names(overall.results.output) == "V2"]<-"RG Percent"                 
-names(overall.results.output)[names(overall.results.output) == "V3"]<-"Misclassify Percent"                 
+names(overall.results.output)[names(overall.results.output) == "V3"]<-"Misclassify Percent"   
+names(overall.results.output)[names(overall.results.output) == "V4"]<-"Test Difficulty"   
 
-write.csv(overall.results.output,"Overall Results - No misclassifications 2022_03_09.csv",row.names = FALSE)
+write.csv(overall.results.output,"Overall Results - No misclassifications 2022_05_16.csv",row.names = FALSE)
