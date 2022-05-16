@@ -361,9 +361,11 @@ for(count.con in 1:nrow(con)) {
       #need to transform parameter estimates onto theta scale
       a.HG<-ipars.HG[c(seq(1,250,5))] 
       b.HG<- -(ipars.HG[c(seq(3,250,5))])/a.HG #I am not sure if there is a problem; trying to convert cfa parameters to irt b=threshold/slope
+      c.HG<-ipars.HG[c(seq(4,250,5))] 
       theta.HG<-matrix(fscores(HG,method='ML',max_theta=4)[,1],ncol=1) #setting upper and lower limits of theta at 4 and -4
       
     } else {
+      c.HG<-rep(NA,2*I)
       theta.HG<-rep(NA,N) #setting upper and lower limits of theta at 4 and -4
       
     }

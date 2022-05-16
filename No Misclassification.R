@@ -369,7 +369,7 @@ for(count.con in 1:nrow(con)) {
       a.HG<-ipars.HG[c(seq(1,250,5))] 
       b.HG<- -(ipars.HG[c(seq(3,250,5))])/a.HG #I am not sure if there is a problem; trying to convert cfa parameters to irt b=-threshold/slope
       d.HG <-ipars.HG[c(seq(3,250,5))]
-      #c.HG<-ipars.HG[c(seq(4,250,5))] 
+      c.HG<-ipars.HG[c(seq(4,250,5))] 
       #results.condition[r,36]<-ipars.HG[504] #Covariance between theta and RG propensity
       theta.HG<-matrix(fscores(HG,method='ML',max_theta=4)[,1],ncol=1) #setting upper and lower limits of theta at 4 and -4
       #results.condition[r,35]<-anova(HG)$BIC
@@ -377,7 +377,7 @@ for(count.con in 1:nrow(con)) {
     } else {
       a.HG<-rep(NA,2*I) 
       b.HG<-rep(NA,2*I)  #I am not sure if there is a problem; trying to convert cfa parameters to irt b=threshold/slope
-      #c.HG<-ipars.HG[c(seq(4,250,5))] 
+      c.HG<-rep(NA,2*I)
       #results.condition[r,36]<-NA #Covariance between theta and RG propensity
       theta.HG<-rep(NA,N) #setting upper and lower limits of theta at 4 and -4
       #results.condition[r,35]<-NA
