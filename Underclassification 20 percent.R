@@ -9,6 +9,7 @@ rm(list=ls())
 
 ##################### Setting working directory ####################
 
+# Needs to be changed before running it
 setwd("G:\\My Drive\\Research\\Projects\\2021-2022\\Two-stage Scoring\\HG-MI")
 
 
