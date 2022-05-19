@@ -73,11 +73,11 @@ colnames(overall.results) <- c(
   "bias.ML.all","bias.EM-I.all","bias.HG-MI.all",
   "bias.ML.low", "bias.EM-I.low", "bias.HG-MI.low",
   "bias.ML.medium", "bias.EM-I.medium", "bias.HG-MI.medium",
-  "bias.ML.high","bias.EM-I.high", "bias.HG-MI.medium",
+  "bias.ML.high","bias.EM-I.high", "bias.HG-MI.high",
   "RMSE.ML.all","RMSE.ML.EM-I.all","RMSE.ML.HG-MI.all",
   "RMSE.ML.ML.low", "RMSE.ML.EM-I.low", "RMSE.ML.HG-MI.low",
   "RMSE.ML.ML.medium", "RMSE.ML.EM-I.medium", "RMSE.ML.HG-MI.medium",
-  "RMSE.ML.ML.high","RMSE.ML.EM-I.high", "RMSE.ML.HG-MI.medium"
+  "RMSE.ML.ML.high","RMSE.ML.EM-I.high", "RMSE.ML.HG-MI.high"
 )
 
 #condition loop starts here
@@ -110,11 +110,11 @@ for(count.con in 1:nrow(con)) {
       probs <- (c.par+((1-c.par)*(1/(1+exp(-logit)))))
       return(probs)}
 
-    if(con[count.con,4]=="Easy"){
+    if(con[count.con,2]=="Easy"){
       probs<-PL3(theta,a.3PL.true.easy,b.3PL.true.easy,c.3PL.true.easy,N,I) #generating motivated response probabilities
-    }else if(con[count.con,4]=="Moderate"){
+    }else if(con[count.con,2]=="Moderate"){
       probs<-PL3(theta,a.3PL.true.mod,b.3PL.true.mod,c.3PL.true.mod,N,I) #generating motivated response probabilities
-    }else if (con[count.con,4]=="Difficult"){
+    }else if (con[count.con,2]=="Difficult"){
       probs<-PL3(theta,a.3PL.true.hard,b.3PL.true.hard,c.3PL.true.hard,N,I) #generating motivated response probabilities
     }
     
@@ -125,12 +125,10 @@ for(count.con in 1:nrow(con)) {
     probs.low<-theta.probs[ which((theta.probs[,1])<=quantile(theta.probs[,1],.69)), ][,-1]
     theta.combined<-rbind(theta.high,theta.low)
     N.over<-nrow(probs.high) #sample size of examinees overclassified
-    N.low<-N-N.over #sample size of examinees overclassified
+    N.low<-N-N.over 
     
-    #breakdown unmotivated simulees into low, medium, and high ability subgroups by their true theta
-    id.high <- which((theta.probs[,1])>quantile(theta.probs[,1],.9))
-    id.medium <- which((theta.probs[,1])>=quantile(theta.probs[,1],.79) | (theta.probs[,1])<=quantile(theta.probs[,1],.9))
-    id.low <- which((theta.probs[,1])>quantile(theta.probs[,1],.69) | (theta.probs[,1])<quantile(theta.probs[,1],.79))
+    
+    
     
     ######################### SAMPLING RANDOM NUMBER OF RGs FOR EACH UNMOTIVATED SIMULEE #######################
     #this is the random number of RGs for condition with 10% RGs
@@ -241,7 +239,7 @@ for(count.con in 1:nrow(con)) {
     if(extract.mirt(EM,'converged')==TRUE){ 
       a.EM<-ipars.EM[c(seq(1,200,4))] 
       b.EM<-ipars.EM[c(seq(2,200,4))] 
-      c.EM<-ipars.ML[c(seq(3,200,4))] 
+      c.EM<-ipars.EM[c(seq(3,200,4))] 
       theta.EM<-as.matrix(fscores(EM,method='ML',max_theta=4))
     } else {
       a.EM<-rep(NA,I) 
@@ -264,6 +262,7 @@ for(count.con in 1:nrow(con)) {
         
         IR.EM.imputed <- IR.combined.NA
         rnd.unif.impute <- matrix(runif(N*I, 0, 1), nrow = N, ncol = I)
+        theta.EM.imputed<-matrix(rep(matrix(rep(NA,N),ncol=1),reps.EM.imputed),ncol=reps.EM.imputed)
         
         for (z in 1: N.over){
           for (v in 1: ncol(IR.combined.NA)) {
@@ -351,6 +350,7 @@ for(count.con in 1:nrow(con)) {
         
         IR.HG.imputed <- IR.combined.NA
         rnd.unif.impute <- matrix(runif(N*I, 0, 1), nrow = N, ncol = I)
+        theta.HG.imputed<-matrix(rep(matrix(rep(NA,N),ncol=1),reps.HG.imputed),ncol=reps.HG.imputed)
         
         for (z in 1: N.over){
           for (v in 1: ncol(IR.combined.NA)) {
@@ -392,38 +392,48 @@ for(count.con in 1:nrow(con)) {
     
     #dropping missing cases for theta.ML
     theta.ML.data<-cbind(theta.ML,theta.combined)
+    na.ML <- which(theta.ML.data[complete.cases(theta.ML.data), ]==0)
     theta.ML.recoded<-matrix(theta.ML.data[complete.cases(theta.ML.data), ],ncol=2)
     theta.ML.recoded <- theta.ML.recoded[!is.infinite(rowSums(theta.ML.recoded)),] #removing any cases with inifite theta estimates
-    theta.ML.recoded <- theta.ML.recoded[1:N.over]
     colnames(theta.ML.recoded)<-c("theta.ML","theta.True")
+    #breakdown unmotivated simulees into low, medium, and high ability subgroups by their true theta
+    id.high.ML <- which((theta.ML.recoded[,2])>quantile(theta.ML.recoded[,2],.9))
+    id.medium.ML <- which((theta.ML.recoded[,2])>=quantile(theta.ML.recoded[,2],.79) & (theta.ML.recoded[,2])<=quantile(theta.ML.recoded[,2],.9))
+    id.low.ML <- which((theta.ML.recoded[,2])>quantile(theta.ML.recoded[,2],.69) & (theta.ML.recoded[,2])<quantile(theta.ML.recoded[,2],.79))
     
     #dropping missing cases for theta.EM
     # theta.EM.data<-cbind(theta.EM,theta.combined)
     # theta.EM.recoded<-matrix(theta.EM.data[complete.cases(theta.EM.data), ],ncol=2)
     # theta.EM.recoded <- theta.EM.recoded[!is.infinite(rowSums(theta.EM.recoded)),] #removing any cases with inifite theta estimates
-    # theta.EM.recoded <- theta.EM.recoded[1:N.over]
+    # theta.EM.recoded <- theta.EM.recoded[1:N.over,]
     # colnames(theta.EM.recoded)<-c("theta.EM","theta.True")
     
     #dropping missing cases for theta.EM.imputed
     theta.EM.imputed.data<-cbind(theta.EM.imputed,theta.combined)
     theta.EM.imputed.recoded<-matrix(theta.EM.imputed.data[complete.cases(theta.EM.imputed.data), ],ncol=2)
     theta.EM.imputed.recoded <- theta.EM.imputed.recoded[!is.infinite(rowSums(theta.EM.imputed.recoded)),] #removing any cases with inifite theta estimates
-    theta.EM.imputed.recoded <- theta.EM.imputed.recoded[1:N.over]
     colnames(theta.EM.imputed.recoded)<-c("theta.EM.imputed","theta.True")
+    #breakdown unmotivated simulees into low, medium, and high ability subgroups by their true theta
+    id.high.EM.imputed <- which((theta.EM.imputed.recoded[,2])>quantile(theta.EM.imputed.recoded[,2],.9))
+    id.medium.EM.imputed <- which((theta.EM.imputed.recoded[,2])>=quantile(theta.EM.imputed.recoded[,2],.79) & (theta.EM.imputed.recoded[,2])<=quantile(theta.EM.imputed.recoded[,2],.9))
+    id.low.EM.imputed <- which((theta.EM.imputed.recoded[,2])>quantile(theta.EM.imputed.recoded[,2],.69) & (theta.EM.imputed.recoded[,2])<quantile(theta.EM.imputed.recoded[,2],.79))
     
     #dropping missing cases for theta.HG
     # theta.HG.data<-cbind(theta.HG,theta.combined)
     # theta.HG.recoded<-matrix(theta.HG.data[complete.cases(theta.HG.data), ],ncol=2)
     # theta.HG.recoded <- theta.HG.recoded[!is.infinite(rowSums(theta.HG.recoded)),] #removing any cases with inifite theta estimates
-    # theta.HG.recoded <- theta.HG.recoded[1:N.over]
+    # theta.HG.recoded <- theta.HG.recoded[1:N.over,]
     # colnames(theta.HG.recoded)<-c("theta.HG","theta.True")
     
     #dropping missing cases for theta.HG.imputed
     theta.HG.imputed.data<-cbind(theta.HG.imputed,theta.combined)
     theta.HG.imputed.recoded<-matrix(theta.HG.imputed.data[complete.cases(theta.HG.imputed.data), ],ncol=2)
     theta.HG.imputed.recoded <- theta.HG.imputed.recoded[!is.infinite(rowSums(theta.HG.imputed.recoded)),] #removing any cases with inifite theta estimates
-    theta.HG.imputed.recoded <- theta.HG.imputed.recoded[1:N.over]
-    colnames(theta.HG.imputed.recoded)<-c("theta.HG.Imputed","theta.True")
+    colnames(theta.HG.imputed.recoded)<-c("theta.HG.imputed","theta.True")
+    #breakdown unmotivated simulees into low, medium, and high ability subgroups by their true theta
+    id.high.HG.imputed <- which((theta.HG.imputed.recoded[,2])>quantile(theta.HG.imputed.recoded[,2],.9))
+    id.medium.HG.imputed <- which((theta.HG.imputed.recoded[,2])>=quantile(theta.HG.imputed.recoded[,2],.79) & (theta.HG.imputed.recoded[,2])<=quantile(theta.HG.imputed.recoded[,2],.9))
+    id.low.HG.imputed <- which((theta.HG.imputed.recoded[,2])>quantile(theta.HG.imputed.recoded[,2],.69) & (theta.HG.imputed.recoded[,2])<quantile(theta.HG.imputed.recoded[,2],.79))
     
     
     ####################################
@@ -434,23 +444,23 @@ for(count.con in 1:nrow(con)) {
     #ML
     if(nrow(theta.ML.recoded)>0){
       results.condition[r,1]<-bias(theta.ML.recoded[,"theta.ML"],theta.ML.recoded[,"theta.True"],type="bias")#all
-      results.condition[r,4]<-bias(theta.ML.recoded[id.low,"theta.ML"],theta.ML.recoded[id.low,"theta.True"],type="bias")#low
-      results.condition[r,7]<-bias(theta.ML.recoded[id.medium,"theta.ML"],theta.ML.recoded[id.medium,"theta.True"],type="bias")#medium
-      results.condition[r,10]<-bias(theta.ML.recoded[id.high,"theta.ML"],theta.ML.recoded[id.high,"theta.True"],type="bias")#high
-      results.condition[r,1]<-RMSE(theta.ML.recoded[,"theta.ML"],theta.ML.recoded[,"theta.True"],type="RMSE")#all
-      results.condition[r,4]<-RMSE(theta.ML.recoded[id.low,"theta.ML"],theta.ML.recoded[id.low,"theta.True"],type="RMSE")#low
-      results.condition[r,7]<-RMSE(theta.ML.recoded[id.medium,"theta.ML"],theta.ML.recoded[id.medium,"theta.True"],type="RMSE")#medium
-      results.condition[r,10]<-RMSE(theta.ML.recoded[id.high,"theta.ML"],theta.ML.recoded[id.high,"theta.True"],type="RMSE")#high
+      results.condition[r,4]<-bias(theta.ML.recoded[id.low.ML,"theta.ML"],theta.ML.recoded[id.low.ML,"theta.True"],type="bias")#low
+      results.condition[r,7]<-bias(theta.ML.recoded[id.medium.ML,"theta.ML"],theta.ML.recoded[id.medium.ML,"theta.True"],type="bias")#medium
+      results.condition[r,10]<-bias(theta.ML.recoded[id.high.ML,"theta.ML"],theta.ML.recoded[id.high.ML,"theta.True"],type="bias")#high
+      results.condition[r,13]<-RMSE(theta.ML.recoded[,"theta.ML"],theta.ML.recoded[,"theta.True"],type="RMSE")#all
+      results.condition[r,16]<-RMSE(theta.ML.recoded[id.low.ML,"theta.ML"],theta.ML.recoded[id.low.ML,"theta.True"],type="RMSE")#low
+      results.condition[r,19]<-RMSE(theta.ML.recoded[id.medium.ML,"theta.ML"],theta.ML.recoded[id.medium.ML,"theta.True"],type="RMSE")#medium
+      results.condition[r,22]<-RMSE(theta.ML.recoded[id.high.ML,"theta.ML"],theta.ML.recoded[id.high.ML,"theta.True"],type="RMSE")#high
       
     } else {
       results.condition[r,1]<-NA
       results.condition[r,4]<-NA
       results.condition[r,7]<-NA
       results.condition[r,10]<-NA
-      results.condition[r,1]<-NA
-      results.condition[r,4]<-NA
-      results.condition[r,7]<-NA
-      results.condition[r,10]<-NA
+      results.condition[r,13]<-NA
+      results.condition[r,16]<-NA
+      results.condition[r,19]<-NA
+      results.condition[r,22]<-NA
     }
     
     
@@ -471,14 +481,14 @@ for(count.con in 1:nrow(con)) {
     
     #EM Imputation
     if(nrow(theta.EM.imputed.recoded)>0){
-      results.condition[r,2]<-bias(theta.EM.imputed.recoded[,"theta.ML"],theta.EM.imputed.recoded[,"theta.True"],type="bias")#all
-      results.condition[r,5]<-bias(theta.EM.imputed.recoded[id.low,"theta.ML"],theta.EM.imputed.recoded[id.low,"theta.True"],type="bias")#low
-      results.condition[r,8]<-bias(theta.EM.imputed.recoded[id.medium,"theta.ML"],theta.EM.imputed.recoded[id.medium,"theta.True"],type="bias")#medium
-      results.condition[r,11]<-bias(theta.EM.imputed.recoded[id.high,"theta.ML"],theta.EM.imputed.recoded[id.high,"theta.True"],type="bias")#high
-      results.condition[r,14]<-RMSE(theta.EM.imputed.recoded[,"theta.ML"],theta.EM.imputed.recoded[,"theta.True"],type="RMSE")#all
-      results.condition[r,17]<-RMSE(theta.EM.imputed.recoded[id.low,"theta.ML"],theta.EM.imputed.recoded[id.low,"theta.True"],type="RMSE")#low
-      results.condition[r,20]<-RMSE(theta.EM.imputed.recoded[id.medium,"theta.ML"],theta.EM.imputed.recoded[id.medium,"theta.True"],type="RMSE")#medium
-      results.condition[r,23]<-RMSE(theta.EM.imputed.recoded[id.high,"theta.ML"],theta.EM.imputed.recoded[id.high,"theta.True"],type="RMSE")#high
+      results.condition[r,2]<-bias(theta.EM.imputed.recoded[,"theta.EM.imputed"],theta.EM.imputed.recoded[,"theta.True"],type="bias")#all
+      results.condition[r,5]<-bias(theta.EM.imputed.recoded[id.low.EM.imputed,"theta.EM.imputed"],theta.EM.imputed.recoded[id.low.EM.imputed,"theta.True"],type="bias")#low
+      results.condition[r,8]<-bias(theta.EM.imputed.recoded[id.medium.EM.imputed,"theta.EM.imputed"],theta.EM.imputed.recoded[id.medium.EM.imputed,"theta.True"],type="bias")#medium
+      results.condition[r,11]<-bias(theta.EM.imputed.recoded[id.high.EM.imputed,"theta.EM.imputed"],theta.EM.imputed.recoded[id.high.EM.imputed,"theta.True"],type="bias")#high
+      results.condition[r,14]<-RMSE(theta.EM.imputed.recoded[,"theta.EM.imputed"],theta.EM.imputed.recoded[,"theta.True"],type="RMSE")#all
+      results.condition[r,17]<-RMSE(theta.EM.imputed.recoded[id.low.EM.imputed,"theta.EM.imputed"],theta.EM.imputed.recoded[id.low.EM.imputed,"theta.True"],type="RMSE")#low
+      results.condition[r,20]<-RMSE(theta.EM.imputed.recoded[id.medium.EM.imputed,"theta.EM.imputed"],theta.EM.imputed.recoded[id.medium.EM.imputed,"theta.True"],type="RMSE")#medium
+      results.condition[r,23]<-RMSE(theta.EM.imputed.recoded[id.high.EM.imputed,"theta.EM.imputed"],theta.EM.imputed.recoded[id.high.EM.imputed,"theta.True"],type="RMSE")#high
       
     } else {
       results.condition[r,2]<-NA
@@ -510,14 +520,14 @@ for(count.con in 1:nrow(con)) {
     
     #HG-MI
     if(nrow(theta.HG.imputed.recoded)>0){
-      results.condition[r,3]<-bias(theta.HG.imputed.recoded[,"theta.ML"],theta.HG.imputed.recoded[,"theta.True"],type="bias")#all
-      results.condition[r,6]<-bias(theta.HG.imputed.recoded[id.low,"theta.ML"],theta.HG.imputed.recoded[id.low,"theta.True"],type="bias")#low
-      results.condition[r,9]<-bias(theta.HG.imputed.recoded[id.medium,"theta.ML"],theta.HG.imputed.recoded[id.medium,"theta.True"],type="bias")#medium
-      results.condition[r,12]<-bias(theta.HG.imputed.recoded[id.high,"theta.ML"],theta.HG.imputed.recoded[id.high,"theta.True"],type="bias")#high
-      results.condition[r,15]<-RMSE(theta.HG.imputed.recoded[,"theta.ML"],theta.HG.imputed.recoded[,"theta.True"],type="RMSE")#all
-      results.condition[r,18]<-RMSE(theta.HG.imputed.recoded[id.low,"theta.ML"],theta.HG.imputed.recoded[id.low,"theta.True"],type="RMSE")#low
-      results.condition[r,21]<-RMSE(theta.HG.imputed.recoded[id.medium,"theta.ML"],theta.HG.imputed.recoded[id.medium,"theta.True"],type="RMSE")#medium
-      results.condition[r,24]<-RMSE(theta.HG.imputed.recoded[id.high,"theta.ML"],theta.HG.imputed.recoded[id.high,"theta.True"],type="RMSE")#high
+      results.condition[r,3]<-bias(theta.HG.imputed.recoded[,"theta.HG.imputed"],theta.HG.imputed.recoded[,"theta.True"],type="bias")#all
+      results.condition[r,6]<-bias(theta.HG.imputed.recoded[id.low.HG.imputed,"theta.HG.imputed"],theta.HG.imputed.recoded[id.low.HG.imputed,"theta.True"],type="bias")#low
+      results.condition[r,9]<-bias(theta.HG.imputed.recoded[id.medium.HG.imputed,"theta.HG.imputed"],theta.HG.imputed.recoded[id.medium.HG.imputed,"theta.True"],type="bias")#medium
+      results.condition[r,12]<-bias(theta.HG.imputed.recoded[id.high.HG.imputed,"theta.HG.imputed"],theta.HG.imputed.recoded[id.high.HG.imputed,"theta.True"],type="bias")#high
+      results.condition[r,15]<-RMSE(theta.HG.imputed.recoded[,"theta.HG.imputed"],theta.HG.imputed.recoded[,"theta.True"],type="RMSE")#all
+      results.condition[r,18]<-RMSE(theta.HG.imputed.recoded[id.low.HG.imputed,"theta.HG.imputed"],theta.HG.imputed.recoded[id.low.HG.imputed,"theta.True"],type="RMSE")#low
+      results.condition[r,21]<-RMSE(theta.HG.imputed.recoded[id.medium.HG.imputed,"theta.HG.imputed"],theta.HG.imputed.recoded[id.medium.HG.imputed,"theta.True"],type="RMSE")#medium
+      results.condition[r,24]<-RMSE(theta.HG.imputed.recoded[id.high.HG.imputed,"theta.HG.imputed"],theta.HG.imputed.recoded[id.high.HG.imputed,"theta.True"],type="RMSE")#high
       
     } else {
       results.condition[r,3]<-NA
