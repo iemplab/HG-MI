@@ -10,13 +10,14 @@ rm(list=ls())
 ##################### Setting working directory ####################
 
 # Needs to be changed before running it
-setwd("G:\\My Drive\\Research\\Projects\\2021-2022\\Two-stage Scoring\\HG-MI")
+#setwd("G:\\My Drive\\Research\\Projects\\2021-2022\\Two-stage Scoring\\HG-MI")
 
 ######### Specifying packages needed for analyses ############
 
 library(dplyr) #combines the simulation results into a condition matrix
 library(SimDesign) #calculate RMSE
 library(mirt) #estimating IRT item parameters
+library(plotrix) #calculate standard error for matrix-format output
 #install.packages("robustbase",lib='C:\\R-4.0.0\\library\\')
 #library(robustbase,lib='C:\\R-4.0.0\\library\\')
 #library(RcppZiggurat,lib='C:\\R-4.0.0\\library\\')
@@ -75,22 +76,23 @@ c.3PL.true.hard<-as.matrix(item.3PL.pars.hard[,3],ncol=1)
 
 
 #creating a matrix for overall results by condition
-overall.results <- matrix(-999, nrow = nrow(con), ncol = 24)
+overall.results <- matrix(-999, nrow = nrow(con), ncol = 26)
 colnames(overall.results) <- c(
   "bias.ML.all","bias.EM-I.all","bias.HG-MI.all",
   "bias.ML.low", "bias.EM-I.low", "bias.HG-MI.low",
   "bias.ML.medium", "bias.EM-I.medium", "bias.HG-MI.medium",
   "bias.ML.high","bias.EM-I.high", "bias.HG-MI.high",
-  "RMSE.ML.all","RMSE.ML.EM-I.all","RMSE.ML.HG-MI.all",
-  "RMSE.ML.ML.low", "RMSE.ML.EM-I.low", "RMSE.ML.HG-MI.low",
-  "RMSE.ML.ML.medium", "RMSE.ML.EM-I.medium", "RMSE.ML.HG-MI.medium",
-  "RMSE.ML.ML.high","RMSE.ML.EM-I.high", "RMSE.ML.HG-MI.high"
+  "RMSE.ML.all","RMSE.EM-I.all","RMSE.HG-MI.all",
+  "RMSE.ML.low", "RMSE.EM-I.low", "RMSE.HG-MI.low",
+  "RMSE.ML.medium", "RMSE.EM-I.medium", "RMSE.HG-MI.medium",
+  "RMSE.ML.high","RMSE.EM-I.high", "RMSE.HG-MI.high",
+  "SE.EM-I.all", "SE.HG-I.all"
 )
 
 #condition loop starts here
 for(count.con in 1:nrow(con)) { 
   
-  results.condition<-matrix(-999,nrow=reps,ncol=24) #creating a matrix to place results in by condition, which will be used for the overall descriptive results
+  results.condition<-matrix(-999,nrow=reps,ncol=26) #creating a matrix to place results in by condition, which will be used for the overall descriptive results
   
   ######### REPLICATION LOOP STARTS HERE
   for (r in 1:reps){
@@ -319,8 +321,11 @@ for(count.con in 1:nrow(con)) {
         }
         
       }   #close 100 rep loops
-        theta.EM.imputed<-matrix(rowMeans(theta.EM.imputed,na.rm=TRUE),ncol=1)
-        
+        theta.EM.imputed[theta.EM.imputed==Inf] <- NA
+        theta.EM.imputed.mean<-matrix(rowMeans(theta.EM.imputed,na.rm=TRUE),ncol=1)
+        var.w.EMI <- (std.error(theta.EM.imputed, na.rm = TRUE)^2)/(reps.EM.imputed)
+        var.b.EMI <- (apply(theta.EM.imputed,MARGIN = 2, var, na.rm=TRUE))/(reps.EM.imputed-1)
+        var.t.EMI <- var.w.EMI+ var.b.EMI+ (var.b.EMI/reps.EM.imputed)
     }#close ifelse loop
     
    
@@ -407,8 +412,11 @@ for(count.con in 1:nrow(con)) {
         }
         
       }   #close 100 rep loops
-      theta.HG.imputed<-matrix(rowMeans(theta.HG.imputed,na.rm=TRUE),ncol=1)
-      
+      theta.HG.imputed[theta.HG.imputed==Inf] <- NA
+      theta.HG.imputed.mean<-matrix(rowMeans(theta.HG.imputed,na.rm=TRUE),ncol=1)
+      var.w.HGI <- (std.error(theta.HG.imputed, na.rm = TRUE)^2)/(reps.HG.imputed)
+      var.b.HGI <- (apply(theta.HG.imputed,MARGIN = 2, var, na.rm=TRUE))/(reps.HG.imputed-1)
+      var.t.HGI <- var.w.HGI+ var.b.EMI+ (var.b.HGI/reps.HG.imputed)
     }#close ifelse loop
     
     
@@ -445,7 +453,7 @@ for(count.con in 1:nrow(con)) {
     # colnames(theta.EM.recoded)<-c("theta.EM","theta.True")
     
     #dropping missing cases for theta.EM.imputed
-    theta.EM.imputed.data<-cbind(theta.EM.imputed,theta.combined)
+    theta.EM.imputed.data<-cbind(theta.EM.imputed.mean,theta.combined)
     theta.EM.imputed.recoded<-matrix(theta.EM.imputed.data[complete.cases(theta.EM.imputed.data), ],ncol=2)
     theta.EM.imputed.recoded <- theta.EM.imputed.recoded[!is.infinite(rowSums(theta.EM.imputed.recoded)),] #removing any cases with inifite theta estimates
     theta.EM.imputed.recoded <- theta.EM.imputed.recoded[1:N.unmot,]
@@ -469,7 +477,7 @@ for(count.con in 1:nrow(con)) {
     # colnames(theta.HG.recoded)<-c("theta.HG","theta.True")
     
     #dropping missing cases for theta.HG.imputed
-    theta.HG.imputed.data<-cbind(theta.HG.imputed,theta.combined)
+    theta.HG.imputed.data<-cbind(theta.HG.imputed.mean,theta.combined)
     theta.HG.imputed.recoded<-matrix(theta.HG.imputed.data[complete.cases(theta.HG.imputed.data), ],ncol=2)
     theta.HG.imputed.recoded <- theta.HG.imputed.recoded[!is.infinite(rowSums(theta.HG.imputed.recoded)),] #removing any cases with inifite theta estimates
     theta.HG.imputed.recoded <- theta.HG.imputed.recoded[1:N.unmot,]
@@ -538,7 +546,7 @@ for(count.con in 1:nrow(con)) {
       results.condition[r,17]<-RMSE(theta.EM.imputed.recoded[id.low.EM.imputed,"theta.EM.imputed"],theta.EM.imputed.recoded[id.low.EM.imputed,"theta.True"],type="RMSE")#low
       results.condition[r,20]<-RMSE(theta.EM.imputed.recoded[id.medium.EM.imputed,"theta.EM.imputed"],theta.EM.imputed.recoded[id.medium.EM.imputed,"theta.True"],type="RMSE")#medium
       results.condition[r,23]<-RMSE(theta.EM.imputed.recoded[id.high.EM.imputed,"theta.EM.imputed"],theta.EM.imputed.recoded[id.high.EM.imputed,"theta.True"],type="RMSE")#high
-      
+      results.condition[r,25]<-mean(var.t.EMI, na.rm = TRUE)#all
     } else {
       results.condition[r,2]<-NA
       results.condition[r,5]<-NA
@@ -548,6 +556,7 @@ for(count.con in 1:nrow(con)) {
       results.condition[r,17]<-NA
       results.condition[r,20]<-NA
       results.condition[r,23]<-NA
+      results.condition[r,25]<-NA
     }
     
     
@@ -577,6 +586,7 @@ for(count.con in 1:nrow(con)) {
       results.condition[r,18]<-RMSE(theta.HG.imputed.recoded[id.low.HG.imputed,"theta.HG.imputed"],theta.HG.imputed.recoded[id.low.HG.imputed,"theta.True"],type="RMSE")#low
       results.condition[r,21]<-RMSE(theta.HG.imputed.recoded[id.medium.HG.imputed,"theta.HG.imputed"],theta.HG.imputed.recoded[id.medium.HG.imputed,"theta.True"],type="RMSE")#medium
       results.condition[r,24]<-RMSE(theta.HG.imputed.recoded[id.high.HG.imputed,"theta.HG.imputed"],theta.HG.imputed.recoded[id.high.HG.imputed,"theta.True"],type="RMSE")#high
+      results.condition[r,26]<-mean(var.t.HGI, na.rm = TRUE)#all
       
     } else {
       results.condition[r,3]<-NA
@@ -587,13 +597,14 @@ for(count.con in 1:nrow(con)) {
       results.condition[r,18]<-NA
       results.condition[r,21]<-NA
       results.condition[r,24]<-NA
+      results.condition[r,26]<-NA
     }
     
     
   } #closes the rep loop
   
   #place descriptive results for each condition into an overall matrix that will be printed out
-  overall.results[count.con,1:24]<-colMeans(results.condition[,1:24],na.rm = TRUE)
+  overall.results[count.con,1:26]<-colMeans(results.condition[,1:26],na.rm = TRUE)
   
   print(count.con) #printing number of condition
   
@@ -612,4 +623,4 @@ names(overall.results.output)[names(overall.results.output) == "V2"]<-"RG Percen
 names(overall.results.output)[names(overall.results.output) == "V3"]<-"Misclassify Percent"   
 names(overall.results.output)[names(overall.results.output) == "V4"]<-"Test Difficulty"   
 
-write.csv(overall.results.output,"Overall Results - No misclassifications 2022_05_18.csv",row.names = FALSE)
+write.csv(overall.results.output,"Overall Results - No misclassifications 2022_05_24.csv",row.names = FALSE)
